@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FocusQuest | スマホ魔王討伐ギルド - 課題達成＆スマホ中毒対策アプリ</title>
+    <meta name="description" content="大学の課題やレポートの締切を管理し、スマホの誘惑（魔物）に打ち勝つためのゲーミフィケーション集中タイマーアプリ。">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=M+PLUS+1p:wght@400;700;900&family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="glass-bg"></div>
+    <div class="glow-orb orb-1"></div>
+    <div class="glow-orb orb-2"></div>
+
+    <div class="app-container">
+        <!-- HEADER: User Profile & Guild Info -->
+        <header class="app-header">
+            <div class="logo">
+                <i class="fa-solid fa-shield-halved brand-icon"></i>
+                <div class="logo-text">
+                    <h1>FocusQuest</h1>
+                    <span>スマホ魔王討伐ギルド</span>
+                </div>
+            </div>
+            
+            <div class="guild-card">
+                <div class="avatar-area">
+                    <div class="avatar"><i class="fa-solid fa-user-ninja"></i></div>
+                    <div class="rank-info">
+                        <div class="rank-title" id="guild-rank">Fランク冒険者</div>
+                        <div class="player-name">ギルドメンバー</div>
+                    </div>
+                </div>
+                <div class="level-badge" id="player-level">Lv.1</div>
+                <div class="exp-bar-container">
+                    <div class="exp-label">EXP</div>
+                    <div class="exp-progress">
+                        <div class="exp-fill" id="exp-fill" style="width: 0%;"></div>
+                    </div>
+                    <div class="exp-text" id="exp-text">0 / 100</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN LAYOUT -->
+        <main class="main-grid">
+            
+            <!-- LEFT PANEL: Quest & Deadline Board -->
+            <section class="panel quest-panel">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-scroll icon-accent"></i> 依頼掲示板 (課題・締切)</h2>
+                    <button class="btn btn-sm btn-primary" id="btn-show-quest-modal">
+                        <i class="fa-solid fa-plus"></i> 新しい依頼
+                    </button>
+                </div>
+
+                <div class="quest-list-container" id="quest-list-container">
+                    <!-- Dynamic quest list will be injected here -->
+                    <div class="empty-state">
+                        <i class="fa-solid fa-folder-open empty-icon"></i>
+                        <p>現在アクティブな依頼（課題）はありません。</p>
+                        <p class="empty-sub">新しい依頼を登録して冒険を始めましょう！</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- CENTER PANEL: Battle Arena -->
+            <section class="panel battle-panel">
+                <div class="panel-header battle-header">
+                    <h2><i class="fa-solid fa-dungeon icon-accent"></i> 集中討伐エリア</h2>
+                    <div class="active-quest-badge" id="active-quest-badge">
+                        <i class="fa-solid fa-location-crosshairs"></i> 対象依頼: <span id="active-quest-title">未選択</span>
+                    </div>
+                </div>
+
+                <!-- Step 1: Battle Setup -->
+                <div class="battle-setup" id="battle-setup-screen">
+                    <p class="setup-guide">討伐する「スマホ魔獣」を選択してください：</p>
+                    <div class="monster-select-grid">
+                        <div class="monster-card active" data-monster="slime">
+                            <div class="monster-preview slime-anim">💧</div>
+                            <div class="monster-name">ダラダラスライム</div>
+                            <div class="monster-desc">なんとなくスマホを眺めてしまう弱い魔獣。</div>
+                            <div class="monster-difficulty"><i class="fa-solid fa-star"></i>★☆☆☆☆ (初級)</div>
+                        </div>
+                        <div class="monster-card" data-monster="dragon">
+                            <div class="monster-preview dragon-anim">🐲</div>
+                            <div class="monster-name">無限スクロール・ドラゴン</div>
+                            <div class="monster-desc">X(Twitter)やSNSのタイムラインを無限に泳ぐ強敵。</div>
+                            <div class="monster-difficulty"><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i>★★★☆☆ (中級)</div>
+                        </div>
+                        <div class="monster-card" data-monster="imp">
+                            <div class="monster-preview imp-anim">😈</div>
+                            <div class="monster-name">ショート動画インプ</div>
+                            <div class="monster-desc">TikTokやYouTube Shortsで脳汁を吸い取る悪魔。</div>
+                            <div class="monster-difficulty"><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i>★★★★★ (特級)</div>
+                        </div>
+                    </div>
+
+                    <div class="timer-setup">
+                        <p class="setup-guide">修行時間（集中時間）を選択：</p>
+                        <div class="duration-select">
+                            <button class="btn btn-outline active" data-time="15">15分 (小戦闘)</button>
+                            <button class="btn btn-outline" data-time="25">25分 (通常討伐)</button>
+                            <button class="btn btn-outline" data-time="50">50分 (大ボス戦)</button>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary btn-large btn-block" id="btn-start-battle" disabled>
+                        <i class="fa-solid fa-sword"></i> 討伐クエストを開始する
+                    </button>
+                    <p class="warning-text text-center mt-2">
+                        <i class="fa-solid fa-circle-info"></i> 開始前に左の「依頼掲示板」から課題を1つ選択してください。
+                    </p>
+                </div>
+
+                <!-- Step 2: Battle In Progress -->
+                <div class="battle-screen hidden" id="battle-active-screen">
+                    <div class="battle-arena-visual">
+                        <div class="character-side">
+                            <div class="combatant-hp">
+                                <div class="combatant-name">あなた</div>
+                                <div class="hp-bar-outer">
+                                    <div class="hp-bar-fill player-hp-fill" id="player-hp" style="width: 100%;"></div>
+                                </div>
+                                <div class="hp-value" id="player-hp-text">100 / 100 HP</div>
+                            </div>
+                            <div class="combatant-sprite player-sprite" id="player-sprite">
+                                <i class="fa-solid fa-shield-halved combat-shield"></i>
+                                🏃💨
+                            </div>
+                        </div>
+
+                        <div class="battle-versus">VS</div>
+
+                        <div class="character-side">
+                            <div class="combatant-hp">
+                                <div class="combatant-name" id="battle-monster-name">ダラダラスライム</div>
+                                <div class="hp-bar-outer">
+                                    <div class="hp-bar-fill monster-hp-fill" id="monster-hp" style="width: 100%;"></div>
+                                </div>
+                                <div class="hp-value" id="monster-hp-text">100 / 100 HP</div>
+                            </div>
+                            <div class="combatant-sprite monster-sprite" id="battle-monster-sprite">
+                                💧
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Ambient Sound Controls -->
+                    <div class="ambient-controls">
+                        <span class="ambient-label"><i class="fa-solid fa-volume-high"></i> 環境音:</span>
+                        <button class="btn btn-sm btn-sound" data-sound="rain">
+                            <i class="fa-solid fa-cloud-rain"></i> 雨の音
+                        </button>
+                        <button class="btn btn-sm btn-sound" data-sound="fire">
+                            <i class="fa-solid fa-fire"></i> 焚き火
+                        </button>
+                        <button class="btn btn-sm btn-sound" data-sound="lofi">
+                            <i class="fa-solid fa-music"></i> Lo-Fiノイズ
+                        </button>
+                    </div>
+
+                    <!-- BIG TIMER -->
+                    <div class="timer-display-container">
+                        <div class="timer-display" id="timer-display">25:00</div>
+                        <div class="tab-warning hidden" id="tab-warning">
+                            <span class="pulse-text"><i class="fa-solid fa-triangle-exclamation"></i> 警告: ブラウザを離れると魔獣が攻撃してきます！</span>
+                        </div>
+                    </div>
+
+                    <!-- ACTIONS -->
+                    <div class="battle-actions">
+                        <button class="btn btn-danger" id="btn-escape-battle">
+                            <i class="fa-solid fa-flag"></i> 逃亡する (リタイア)
+                        </button>
+                        <button class="btn btn-warning" id="btn-resist-urge">
+                            <i class="fa-solid fa-brain"></i> スマホを見たい衝動を抑える
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 3: Battle Result (Overlays) -->
+                <div class="battle-result-overlay hidden" id="battle-result-screen">
+                    <div class="result-card glass-panel">
+                        <div class="result-icon" id="result-icon">🏆</div>
+                        <h3 id="result-title">討伐成功！</h3>
+                        <p id="result-desc">おめでとうございます！魔物を見事に撃退しました。</p>
+                        <div class="reward-box">
+                            <div class="reward-item">
+                                <span class="reward-label">獲得EXP</span>
+                                <span class="reward-val" id="reward-exp">+50</span>
+                            </div>
+                            <div class="reward-item">
+                                <span class="reward-label">課題進捗</span>
+                                <span class="reward-val" id="reward-progress">+1 集中マス</span>
+                            </div>
+                        </div>
+                        <button class="btn btn-primary" id="btn-result-close">ギルドに戻る</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- RIGHT PANEL: Guild Statistics -->
+            <section class="panel stats-panel">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-chart-line icon-accent"></i> 討伐実績＆スタッツ</h2>
+                </div>
+
+                <div class="stats-overview">
+                    <div class="stat-card">
+                        <span class="stat-val" id="stat-total-time">0</span>
+                        <span class="stat-label">合計集中(分)</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-val" id="stat-defeated-monsters">0</span>
+                        <span class="stat-label">討伐魔獣数</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-val" id="stat-resisted-urges">0</span>
+                        <span class="stat-label">衝動抑制数</span>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <canvas id="weekly-chart"></canvas>
+                </div>
+
+                <div class="history-list-section">
+                    <h3><i class="fa-solid fa-clock-rotate-left"></i> 最近の討伐ログ</h3>
+                    <div class="history-list" id="history-list">
+                        <!-- Dynamic list -->
+                        <p class="empty-sub text-center py-3">討伐ログはまだありません。</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- MODAL: Create New Quest -->
+    <div class="modal-overlay hidden" id="quest-modal">
+        <div class="modal-content glass-panel">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-scroll icon-accent"></i> 新たな依頼（課題）を登録する</h3>
+                <button class="btn-close" id="btn-close-quest-modal">&times;</button>
+            </div>
+            <form id="quest-form">
+                <div class="form-group">
+                    <label for="quest-title">課題名 (例: 経済学レポート作成)</label>
+                    <input type="text" id="quest-title" required placeholder="レポート作成、数理課題など..." maxlength="30">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="quest-deadline">期限 (締切日時)</label>
+                        <input type="datetime-local" id="quest-deadline" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="quest-est-pomos">必要そうな集中コマ数 (25分単価)</label>
+                        <select id="quest-est-pomos">
+                            <option value="1">1コマ (約25分)</option>
+                            <option value="2">2コマ (約50分)</option>
+                            <option value="4">4コマ (約100分)</option>
+                            <option value="8">8コマ (約200分)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="quest-difficulty">難易度 (獲得EXPに影響)</label>
+                    <div class="difficulty-options">
+                        <label class="diff-radio">
+                            <input type="radio" name="difficulty" value="easy" checked>
+                            <span>EASY (日常課題)</span>
+                        </label>
+                        <label class="diff-radio">
+                            <input type="radio" name="difficulty" value="medium">
+                            <span>MEDIUM (普通レポート)</span>
+                        </label>
+                        <label class="diff-radio">
+                            <input type="radio" name="difficulty" value="hard">
+                            <span>HARD (期末テスト/重い課題)</span>
+                        </label>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">掲示板に貼り出す</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Resist Urge Breathing Exercise -->
+    <div class="modal-overlay hidden" id="urge-modal">
+        <div class="modal-content glass-panel urge-modal-content text-center">
+            <h3><i class="fa-solid fa-brain icon-accent animate-pulse"></i> 賢者の呼吸で誘惑を断ち切る</h3>
+            <p class="urge-intro">スマホに触りたい衝動は一時的な波です。30秒間、深呼吸を繰り返して波を乗り越えましょう。</p>
+            
+            <div class="breathing-circle-container">
+                <div class="breathing-circle" id="breathing-circle"></div>
+                <div class="breathing-instruction" id="breathing-instruction">吸って...</div>
+            </div>
+
+            <div class="breathing-timer" id="breathing-timer">30</div>
+            
+            <button class="btn btn-outline mt-3" id="btn-skip-urge">呼吸法を終了する</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

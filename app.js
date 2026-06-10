@@ -7,7 +7,16 @@ let state = {
         rank: 'Fランク冒険者',
         totalMinutes: 0,
         defeatedCount: 0,
-        resistedCount: 0
+        resistedCount: 0,
+        gold: 0,
+        streak: 0,
+        lastActiveDate: null,
+        lastClaimedDate: null,
+        checkinIndex: 0,
+        unlockedTitles: ['Fランク冒険者'],
+        unlockedThemes: ['default'],
+        activeTheme: 'default',
+        activeTitle: ''
     },
     history: [],
     activeQuestId: null,
@@ -24,9 +33,8 @@ let state = {
         monsterHp: 100,
         isWarningActive: false
     },
-    weeklyStats: {
-        // format: 'YYYY-MM-DD': minutes
-    }
+    weeklyStats: {},
+    customRewards: []
 };
 
 // Web Audio API Context & Nodes
@@ -39,11 +47,21 @@ let soundNodes = {
     scriptNode: null // for fire crackle generator
 };
 
-// Monster Specs
+// Constants
+const LOGIN_REWARDS = [
+    { g: 15, exp: 15 },  // Day 1
+    { g: 25, exp: 15 },  // Day 2
+    { g: 35, exp: 20 },  // Day 3
+    { g: 50, exp: 25 },  // Day 4
+    { g: 70, exp: 30 },  // Day 5
+    { g: 95, exp: 40 },  // Day 6
+    { g: 150, exp: 60 }  // Day 7
+];
+
 const MONSTER_SPECS = {
-    slime: { name: 'ダラダラスライム', emoji: '💧', baseExp: 30, dmgMultiplier: 1.0 },
-    dragon: { name: '無限スクロール・ドラゴン', emoji: '🐲', baseExp: 80, dmgMultiplier: 1.5 },
-    imp: { name: 'ショート動画インプ', emoji: '😈', baseExp: 150, dmgMultiplier: 2.0 }
+    slime: { name: 'ダラダラスライム', emoji: '💧', baseExp: 30, baseGold: 20, dmgMultiplier: 1.0 },
+    dragon: { name: '無限スクロール・ドラゴン', emoji: '🐲', baseExp: 80, baseGold: 50, dmgMultiplier: 1.5 },
+    imp: { name: 'ショート動画インプ', emoji: '😈', baseExp: 150, baseGold: 100, dmgMultiplier: 2.0 }
 };
 
 // Ranks
@@ -110,7 +128,22 @@ const el = {
     breathingCircle: document.getElementById('breathing-circle'),
     breathingInstruction: document.getElementById('breathing-instruction'),
     breathingTimer: document.getElementById('breathing-timer'),
-    btnSkipUrge: document.getElementById('btn-skip-urge')
+    btnSkipUrge: document.getElementById('btn-skip-urge'),
+
+    // Phase 2 Elements
+    playerGold: document.getElementById('player-gold'),
+    playerStreak: document.getElementById('player-streak'),
+    tabBtnStats: document.getElementById('tab-btn-stats'),
+    tabBtnShop: document.getElementById('tab-btn-shop'),
+    panelStats: document.getElementById('panel-content-stats'),
+    panelShop: document.getElementById('panel-content-shop'),
+    customRewardsList: document.getElementById('custom-rewards-list'),
+    rewardAddForm: document.getElementById('reward-add-form'),
+    loginModal: document.getElementById('login-modal'),
+    checkinGrid: document.getElementById('checkin-grid'),
+    loginStreakCount: document.getElementById('login-streak-count'),
+    loginMultiplierVal: document.getElementById('login-multiplier-val'),
+    btnClaimLogin: document.getElementById('btn-claim-login')
 };
 
 // Chart Instance
@@ -119,11 +152,26 @@ let weeklyChart = null;
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     loadData();
+    applyTheme();
     renderQuests();
     updatePlayerUI();
     updateStatsUI();
     initChart();
     setupEventListeners();
+    
+    // Custom Rewards default templates
+    if (state.customRewards.length === 0) {
+        state.customRewards = [
+            { id: 'r_1', name: 'ゲームを1時間遊ぶ', cost: 100 },
+            { id: 'r_2', name: '美味しいおやつを食べる', cost: 50 },
+            { id: 'r_3', name: 'スマホを30分自由にいじる', cost: 70 }
+        ];
+        saveData();
+    }
+    renderShop();
+
+    // Check Daily Login Bonus
+    setTimeout(checkLoginBonus, 800);
     
     // Page Visibility API
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -175,6 +223,37 @@ function setupEventListeners() {
     // Urge Buttons
     el.btnResistUrge.addEventListener('click', openUrgeModal);
     el.btnSkipUrge.addEventListener('click', closeUrgeModal);
+
+    // Tab buttons for right panel
+    el.tabBtnStats.addEventListener('click', () => {
+        el.tabBtnStats.classList.add('active');
+        el.tabBtnShop.classList.remove('active');
+        el.panelStats.classList.remove('hidden');
+        el.panelShop.classList.add('hidden');
+    });
+
+    el.tabBtnShop.addEventListener('click', () => {
+        el.tabBtnShop.classList.add('active');
+        el.tabBtnStats.classList.remove('active');
+        el.panelShop.classList.remove('hidden');
+        el.panelStats.classList.add('hidden');
+    });
+
+    // Custom reward form submit
+    el.rewardAddForm.addEventListener('submit', handleAddCustomReward);
+
+    // Shop Item click buy
+    document.querySelectorAll('.btn-shop-buy').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const type = btn.dataset.type;
+            const item = btn.dataset.item;
+            const price = parseInt(btn.dataset.price);
+            buyShopItem(type, item, price);
+        });
+    });
+
+    // Login Claim Button
+    el.btnClaimLogin.addEventListener('click', claimLoginReward);
 }
 
 // Check if a quest is selected to enable "Start Battle"
@@ -481,10 +560,17 @@ function completeFocusBattle(isVictory) {
     const quest = state.quests.find(q => q.id === state.activeQuestId);
     
     if (isVictory) {
+        // Update Streaks
+        updateStreak();
+
         // Calculate EXP
         let expAwarded = monster.baseExp;
         if (quest.difficulty === 'medium') expAwarded = Math.round(expAwarded * 1.3);
         if (quest.difficulty === 'hard') expAwarded = Math.round(expAwarded * 1.8);
+        
+        // Calculate Gold with Streak Multiplier
+        const mult = getStreakMultiplier(state.player.streak);
+        let goldAwarded = Math.round(monster.baseGold * mult);
         
         // Increment Pomo progress on quest
         quest.completedPomos = Math.min(quest.estPomos, quest.completedPomos + 1);
@@ -497,6 +583,7 @@ function completeFocusBattle(isVictory) {
         
         // Update player statistics
         state.player.exp += expAwarded;
+        state.player.gold += goldAwarded;
         state.player.totalMinutes += state.selectedDuration;
         state.player.defeatedCount++;
         
@@ -513,7 +600,7 @@ function completeFocusBattle(isVictory) {
         }
         
         // Update weekly stats
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = new Date().toLocaleDateString('en-CA');
         state.weeklyStats[todayStr] = (state.weeklyStats[todayStr] || 0) + state.selectedDuration;
         
         // Add to history
@@ -529,8 +616,13 @@ function completeFocusBattle(isVictory) {
         el.resultIcon.textContent = '🏆';
         el.resultTitle.textContent = '討伐成功！';
         el.resultDesc.textContent = `「${monster.name}」を討伐し、${quest.title} の修行（1コマ）を達成しました！`;
-        el.rewardExp.textContent = `+${expAwarded}`;
-        el.rewardProgress.textContent = `+1 集中コマ (${quest.completedPomos}/${quest.estPomos})`;
+        el.rewardExp.textContent = `+${expAwarded} EXP`;
+        
+        let goldRewardText = `+${goldAwarded} G`;
+        if (mult > 1.0) {
+            goldRewardText += ` (連続ボーナス ${mult}x!)`;
+        }
+        el.rewardProgress.textContent = goldRewardText;
         
         playSynthSound('victory');
         
@@ -550,6 +642,7 @@ function completeFocusBattle(isVictory) {
     renderQuests();
     updatePlayerUI();
     updateStatsUI();
+    renderShop();
     updateChart();
     
     // Display result screen overlay
@@ -631,8 +724,10 @@ function completeUrgeSession() {
     // Session success
     state.player.resistedCount++;
     
-    // Reward small EXP
+    // Reward small EXP & Gold
     state.player.exp += 5;
+    state.player.gold += 5;
+    
     let leveledUp = false;
     while (state.player.exp >= state.player.level * 100) {
         state.player.exp -= state.player.level * 100;
@@ -644,11 +739,12 @@ function completeUrgeSession() {
     saveData();
     updatePlayerUI();
     updateStatsUI();
+    renderShop();
     
     // Synthesize successful chime
     playSynthSound('victory-short');
     
-    alert("お見事！誘惑の波を乗り越えました。集中を継続しましょう。");
+    alert("お見事！誘惑の波を乗り越えました。集中を継続しましょう。(活動支援金 +5G)");
     closeUrgeModal();
 }
 
@@ -924,13 +1020,19 @@ function updatePlayerRank() {
 
 function updatePlayerUI() {
     el.playerLevel.textContent = `Lv.${state.player.level}`;
-    el.guildRank.textContent = state.player.rank;
+    
+    // Display Title badge if active, otherwise display Rank title
+    el.guildRank.textContent = state.player.activeTitle || state.player.rank;
     
     const maxExp = state.player.level * 100;
     const progressPercent = Math.min(100, (state.player.exp / maxExp) * 100);
     
     el.expFill.style.width = `${progressPercent}%`;
     el.expText.textContent = `${state.player.exp} / ${maxExp} EXP`;
+
+    // Phase 2 Badges
+    el.playerGold.textContent = state.player.gold;
+    el.playerStreak.textContent = state.player.streak;
 }
 
 function updateStatsUI() {
@@ -963,6 +1065,306 @@ function updateStatsUI() {
 }
 
 // -------------------------------------------------------------
+// STREAKS & login bonuses (PHASE 2)
+// -------------------------------------------------------------
+function updateStreak() {
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    
+    if (!state.player.lastActiveDate) {
+        state.player.streak = 1;
+    } else {
+        const lastDate = new Date(state.player.lastActiveDate);
+        const today = new Date(todayStr);
+        const diffTime = Math.abs(today - lastDate);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays === 1) {
+            state.player.streak++;
+        } else if (diffDays > 1) {
+            state.player.streak = 1; // reset streak
+        }
+        // If diffDays === 0, keep current streak (already active today)
+    }
+    state.player.lastActiveDate = todayStr;
+}
+
+function getStreakMultiplier(streak) {
+    if (streak >= 7) return 2.0;
+    if (streak >= 5) return 1.5;
+    if (streak >= 3) return 1.2;
+    if (streak >= 1) return 1.0;
+    return 1.0;
+}
+
+function checkLoginBonus() {
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    
+    // Check if claimed already today
+    if (state.player.lastClaimedDate !== todayStr) {
+        // Check if streak was broken since last login
+        if (state.player.lastActiveDate) {
+            const lastActive = new Date(state.player.lastActiveDate);
+            const today = new Date(todayStr);
+            const diffTime = Math.abs(today - lastActive);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            if (diffDays > 1) {
+                state.player.streak = 0; // reset streak due to inactivity
+                saveData();
+                updatePlayerUI();
+            }
+        }
+
+        // Open Daily Login modal
+        el.loginStreakCount.textContent = state.player.streak;
+        el.loginMultiplierVal.textContent = getStreakMultiplier(state.player.streak);
+        renderLoginBoard();
+        el.loginModal.classList.remove('hidden');
+    }
+}
+
+function renderLoginBoard() {
+    el.checkinGrid.innerHTML = '';
+    const currentIndex = state.player.checkinIndex || 0;
+    
+    for (let i = 0; i < 7; i++) {
+        const reward = LOGIN_REWARDS[i];
+        const dayCard = document.createElement('div');
+        dayCard.className = 'checkin-day';
+        
+        if (i < currentIndex) {
+            dayCard.classList.add('claimed-day');
+        } else if (i === currentIndex) {
+            dayCard.classList.add('active-day');
+        }
+        
+        dayCard.innerHTML = `
+            <span class="checkin-day-num">Day ${i+1}</span>
+            <span class="checkin-icon">${i === 6 ? '🎁' : '🪙'}</span>
+            <span class="checkin-val-badge">${reward.g}G</span>
+            <div class="checkin-stamp"><i class="fa-solid fa-check"></i></div>
+        `;
+        el.checkinGrid.appendChild(dayCard);
+    }
+}
+
+function claimLoginReward() {
+    initAudioContext();
+    const currentIndex = state.player.checkinIndex || 0;
+    const reward = LOGIN_REWARDS[currentIndex];
+    
+    // Award
+    state.player.gold += reward.g;
+    state.player.exp += reward.exp;
+    
+    let leveledUp = false;
+    while (state.player.exp >= state.player.level * 100) {
+        state.player.exp -= state.player.level * 100;
+        state.player.level++;
+        leveledUp = true;
+    }
+    if (leveledUp) updatePlayerRank();
+    
+    // Set Claimed dates
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    state.player.lastClaimedDate = todayStr;
+    state.player.checkinIndex = (currentIndex + 1) % 7;
+    
+    saveData();
+    updatePlayerUI();
+    renderShop();
+    
+    playSynthSound('victory');
+    
+    // Animate stamp bounce on the active day card
+    const activeCard = el.checkinGrid.querySelector('.active-day');
+    if (activeCard) {
+        activeCard.classList.remove('active-day');
+        activeCard.classList.add('claimed-day');
+    }
+
+    setTimeout(() => {
+        el.loginModal.classList.add('hidden');
+        alert(`本日分の給与を獲得しました！\n【獲得ゴールド】: ${reward.g} G\n【獲得経験値】: ${reward.exp} EXP`);
+    }, 600);
+}
+
+// -------------------------------------------------------------
+// GUILD SHOP & CUSTOM REWARDS (PHASE 2)
+// -------------------------------------------------------------
+function renderShop() {
+    // 1. Render Custom Rewards List
+    el.customRewardsList.innerHTML = '';
+    
+    if (state.customRewards.length === 0) {
+        el.customRewardsList.innerHTML = '<p class="empty-sub text-center py-2">ご褒美は登録されていません。</p>';
+    } else {
+        state.customRewards.forEach(reward => {
+            const card = document.createElement('div');
+            card.className = 'reward-card';
+            
+            const isAffordable = state.player.gold >= reward.cost;
+            
+            card.innerHTML = `
+                <div class="shop-item-info">
+                    <span class="shop-item-name">${reward.name}</span>
+                    <span class="shop-item-price"><i class="fa-solid fa-coins"></i> ${reward.cost} G</span>
+                </div>
+                <div style="display: flex; align-items: center;">
+                    <button class="btn btn-reward-redeem" ${isAffordable ? '' : 'disabled'} onclick="redeemReward('${reward.id}')">
+                        引き換える
+                    </button>
+                    <button class="btn-reward-delete" onclick="deleteReward('${reward.id}', event)" title="ご褒美を削除">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            `;
+            el.customRewardsList.appendChild(card);
+        });
+    }
+
+    // 2. Render Shop item buy buttons state
+    document.querySelectorAll('.btn-shop-buy').forEach(btn => {
+        const type = btn.dataset.type;
+        const item = btn.dataset.item;
+        const price = parseInt(btn.dataset.price);
+        
+        let isUnlocked = false;
+        let isActive = false;
+        
+        if (type === 'title') {
+            isUnlocked = state.player.unlockedTitles.includes(item);
+            isActive = state.player.activeTitle === item;
+        } else if (type === 'theme') {
+            isUnlocked = state.player.unlockedThemes.includes(item);
+            isActive = state.player.activeTheme === item;
+        }
+        
+        if (isActive) {
+            btn.textContent = '装着中';
+            btn.className = 'btn btn-sm btn-outline active';
+            btn.disabled = true;
+        } else if (isUnlocked) {
+            btn.textContent = '適用';
+            btn.className = 'btn btn-sm btn-outline';
+            btn.disabled = false;
+        } else {
+            btn.innerHTML = `<i class="fa-solid fa-lock"></i> ${price}G`;
+            btn.className = 'btn btn-sm btn-primary';
+            btn.disabled = state.player.gold < price;
+        }
+    });
+}
+
+function handleAddCustomReward(e) {
+    e.preventDefault();
+    const name = document.getElementById('add-reward-name').value.trim();
+    const cost = parseInt(document.getElementById('add-reward-cost').value);
+    
+    if (!name || isNaN(cost) || cost <= 0) return;
+    
+    const newReward = {
+        id: 'r_' + Date.now(),
+        name,
+        cost
+    };
+    
+    state.customRewards.push(newReward);
+    saveData();
+    renderShop();
+    
+    el.rewardAddForm.reset();
+}
+
+// Global scope functions since triggered by onclick in dynamic elements
+window.redeemReward = function(id) {
+    initAudioContext();
+    const rewardIndex = state.customRewards.findIndex(r => r.id === id);
+    if (rewardIndex === -1) return;
+    
+    const reward = state.customRewards[rewardIndex];
+    if (state.player.gold < reward.cost) {
+        alert("ゴールドが足りません！討伐クエストで稼ぎましょう。");
+        return;
+    }
+    
+    if (confirm(`「${reward.name}」を引き換えますか？\n(${reward.cost} G を消費します)`)) {
+        state.player.gold -= reward.cost;
+        saveData();
+        updatePlayerUI();
+        renderShop();
+        playSynthSound('victory-short');
+        alert(`ご褒美「${reward.name}」を獲得しました！ゲームをエンジョイしてください！`);
+    }
+};
+
+window.deleteReward = function(id, event) {
+    event.stopPropagation();
+    if (confirm("このご褒美を削除しますか？")) {
+        state.customRewards = state.customRewards.filter(r => r.id !== id);
+        saveData();
+        renderShop();
+    }
+};
+
+function buyShopItem(type, item, price) {
+    initAudioContext();
+    
+    let isUnlocked = false;
+    if (type === 'title') {
+        isUnlocked = state.player.unlockedTitles.includes(item);
+    } else if (type === 'theme') {
+        isUnlocked = state.player.unlockedThemes.includes(item);
+    }
+    
+    if (isUnlocked) {
+        // Just apply
+        if (type === 'title') {
+            state.player.activeTitle = item;
+        } else if (type === 'theme') {
+            state.player.activeTheme = item;
+            applyTheme();
+        }
+        playSynthSound('victory-short');
+    } else {
+        // Buy & Unlock
+        if (state.player.gold < price) {
+            alert("ゴールドが足りません！");
+            return;
+        }
+        
+        if (confirm(`「${item}」を ${price} G で購入しますか？`)) {
+            state.player.gold -= price;
+            
+            if (type === 'title') {
+                state.player.unlockedTitles.push(item);
+                state.player.activeTitle = item;
+            } else if (type === 'theme') {
+                state.player.unlockedThemes.push(item);
+                state.player.activeTheme = item;
+                applyTheme();
+            }
+            
+            playSynthSound('victory');
+            alert(`「${item}」のロックを解除しました！`);
+        }
+    }
+    
+    saveData();
+    updatePlayerUI();
+    renderShop();
+}
+
+function applyTheme() {
+    // Reset themes
+    document.body.classList.remove('theme-cyberpunk', 'theme-forest', 'theme-sunset');
+    
+    const theme = state.player.activeTheme || 'default';
+    if (theme !== 'default') {
+        document.body.classList.add(`theme-${theme}`);
+    }
+}
+
+// -------------------------------------------------------------
 // CHARTING (Chart.js)
 // -------------------------------------------------------------
 function initChart() {
@@ -975,7 +1377,7 @@ function initChart() {
     for (let i = 6; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
-        const dateStr = d.toISOString().split('T')[0];
+        const dateStr = d.toLocaleDateString('en-CA');
         dates.push(d.toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit' }));
         minutes.push(state.weeklyStats[dateStr] || 0);
     }
@@ -1035,7 +1437,7 @@ function updateChart() {
     for (let i = 6; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
-        const dateStr = d.toISOString().split('T')[0];
+        const dateStr = d.toLocaleDateString('en-CA');
         minutes.push(state.weeklyStats[dateStr] || 0);
     }
     
@@ -1055,11 +1457,33 @@ function loadData() {
     if (saved) {
         try {
             const parsed = JSON.parse(saved);
-            state = { ...state, ...parsed };
-            // Ensure array structures match in case of older schemas
-            if (!Array.isArray(state.quests)) state.quests = [];
-            if (!Array.isArray(state.history)) state.history = [];
-            if (!state.weeklyStats) state.weeklyStats = {};
+            
+            // Safe copy of primary fields
+            state.quests = parsed.quests || [];
+            state.history = parsed.history || [];
+            state.weeklyStats = parsed.weeklyStats || {};
+            state.customRewards = parsed.customRewards || [];
+            state.activeQuestId = parsed.activeQuestId || null;
+            state.selectedMonster = parsed.selectedMonster || 'slime';
+            state.selectedDuration = parsed.selectedDuration || 15;
+            
+            if (parsed.player) {
+                state.player.level = parsed.player.level || 1;
+                state.player.exp = parsed.player.exp || 0;
+                state.player.rank = parsed.player.rank || 'Fランク冒険者';
+                state.player.totalMinutes = parsed.player.totalMinutes || 0;
+                state.player.defeatedCount = parsed.player.defeatedCount || 0;
+                state.player.resistedCount = parsed.player.resistedCount || 0;
+                state.player.gold = parsed.player.gold || 0;
+                state.player.streak = parsed.player.streak || 0;
+                state.player.lastActiveDate = parsed.player.lastActiveDate || null;
+                state.player.lastClaimedDate = parsed.player.lastClaimedDate || null;
+                state.player.checkinIndex = parsed.player.checkinIndex || 0;
+                state.player.unlockedTitles = parsed.player.unlockedTitles || ['Fランク冒険者'];
+                state.player.unlockedThemes = parsed.player.unlockedThemes || ['default'];
+                state.player.activeTheme = parsed.player.activeTheme || 'default';
+                state.player.activeTitle = parsed.player.activeTitle || '';
+            }
         } catch (e) {
             console.error("Could not parse saved storage data.", e);
         }

@@ -31,6 +31,15 @@
                 </div>
             </div>
             
+            <div class="guild-stats-badges">
+                <div class="gold-badge" title="所持ゴールド">
+                    <i class="fa-solid fa-coins"></i> <span id="player-gold">0</span> G
+                </div>
+                <div class="streak-badge" title="連続集中日数">
+                    <i class="fa-solid fa-fire"></i> <span id="player-streak">0</span>日連続
+                </div>
+            </div>
+
             <div class="guild-card">
                 <div class="avatar-area">
                     <div class="avatar"><i class="fa-solid fa-user-ninja"></i></div>
@@ -209,36 +218,132 @@
                 </div>
             </section>
 
-            <!-- RIGHT PANEL: Guild Statistics -->
+            <!-- RIGHT PANEL: Guild Statistics & Shop -->
             <section class="panel stats-panel">
-                <div class="panel-header">
-                    <h2><i class="fa-solid fa-chart-line icon-accent"></i> 討伐実績＆スタッツ</h2>
-                </div>
-
-                <div class="stats-overview">
-                    <div class="stat-card">
-                        <span class="stat-val" id="stat-total-time">0</span>
-                        <span class="stat-label">合計集中(分)</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-val" id="stat-defeated-monsters">0</span>
-                        <span class="stat-label">討伐魔獣数</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-val" id="stat-resisted-urges">0</span>
-                        <span class="stat-label">衝動抑制数</span>
+                <div class="panel-header" style="flex-direction: column; align-items: stretch; gap: 12px; border-bottom: none; padding-bottom: 0;">
+                    <div class="panel-tabs">
+                        <button class="tab-btn active" id="tab-btn-stats">
+                            <i class="fa-solid fa-chart-line"></i> 実績・ログ
+                        </button>
+                        <button class="tab-btn" id="tab-btn-shop">
+                            <i class="fa-solid fa-store"></i> ギルドショップ
+                        </button>
                     </div>
                 </div>
 
-                <div class="chart-container">
-                    <canvas id="weekly-chart"></canvas>
+                <!-- SUB-PANEL 1: Stats & History -->
+                <div class="stats-sub-panel" id="panel-content-stats">
+                    <div class="stats-overview">
+                        <div class="stat-card">
+                            <span class="stat-val" id="stat-total-time">0</span>
+                            <span class="stat-label">合計集中(分)</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-val" id="stat-defeated-monsters">0</span>
+                            <span class="stat-label">討伐魔獣数</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-val" id="stat-resisted-urges">0</span>
+                            <span class="stat-label">衝動抑制数</span>
+                        </div>
+                    </div>
+
+                    <div class="chart-container" style="margin-top: 15px;">
+                        <canvas id="weekly-chart"></canvas>
+                    </div>
+
+                    <div class="history-list-section" style="margin-top: 20px;">
+                        <h3><i class="fa-solid fa-clock-rotate-left"></i> 最近の討伐ログ</h3>
+                        <div class="history-list" id="history-list">
+                            <p class="empty-sub text-center py-3">討伐ログはまだありません。</p>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="history-list-section">
-                    <h3><i class="fa-solid fa-clock-rotate-left"></i> 最近の討伐ログ</h3>
-                    <div class="history-list" id="history-list">
-                        <!-- Dynamic list -->
-                        <p class="empty-sub text-center py-3">討伐ログはまだありません。</p>
+                <!-- SUB-PANEL 2: Shop & Rewards -->
+                <div class="shop-sub-panel hidden" id="panel-content-shop">
+                    <div class="shop-container">
+                        
+                        <!-- Titles Section -->
+                        <div class="shop-section">
+                            <h3 class="shop-section-title"><i class="fa-solid fa-award"></i> 限定称号</h3>
+                            <div class="shop-grid">
+                                <div class="shop-item-card">
+                                    <div class="shop-item-info">
+                                        <span class="shop-item-name">スマホ断ちの達人</span>
+                                        <span class="shop-item-desc">誘惑に打ち勝つ証。</span>
+                                        <span class="shop-item-price"><i class="fa-solid fa-coins"></i> 100 G</span>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline btn-shop-buy" data-type="title" data-item="スマホ断ちの達人" data-price="100">購入</button>
+                                </div>
+                                <div class="shop-item-card">
+                                    <div class="shop-item-info">
+                                        <span class="shop-item-name">時間管理の魔術師</span>
+                                        <span class="shop-item-desc">時間を自在に操る者。</span>
+                                        <span class="shop-item-price"><i class="fa-solid fa-coins"></i> 250 G</span>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline btn-shop-buy" data-type="title" data-item="時間管理の魔術師" data-price="250">購入</button>
+                                </div>
+                                <div class="shop-item-card">
+                                    <div class="shop-item-info">
+                                        <span class="shop-item-name">伝説のギルド長</span>
+                                        <span class="shop-item-desc">すべての課題を制覇した証。</span>
+                                        <span class="shop-item-price"><i class="fa-solid fa-coins"></i> 500 G</span>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline btn-shop-buy" data-type="title" data-item="伝説のギルド長" data-price="500">購入</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Themes Section -->
+                        <div class="shop-section">
+                            <h3 class="shop-section-title"><i class="fa-solid fa-palette"></i> アプリテーマ</h3>
+                            <div class="shop-grid">
+                                <div class="shop-item-card">
+                                    <div class="shop-item-info">
+                                        <span class="shop-item-name">サイバーパンク</span>
+                                        <span class="shop-item-desc">ネオン輝く電子の戦場。</span>
+                                        <span class="shop-item-price"><i class="fa-solid fa-coins"></i> 150 G</span>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline btn-shop-buy" data-type="theme" data-item="cyberpunk" data-price="150">購入</button>
+                                </div>
+                                <div class="shop-item-card">
+                                    <div class="shop-item-info">
+                                        <span class="shop-item-name">フォレスト・ゼン</span>
+                                        <span class="shop-item-desc">深い森と静寂の集中空間。</span>
+                                        <span class="shop-item-price"><i class="fa-solid fa-coins"></i> 250 G</span>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline btn-shop-buy" data-type="theme" data-item="forest" data-price="250">購入</button>
+                                </div>
+                                <div class="shop-item-card">
+                                    <div class="shop-item-info">
+                                        <span class="shop-item-name">サンセット・チル</span>
+                                        <span class="shop-item-desc">夕暮れ時のリラックスカラー。</span>
+                                        <span class="shop-item-price"><i class="fa-solid fa-coins"></i> 400 G</span>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline btn-shop-buy" data-type="theme" data-item="sunset" data-price="400">購入</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Custom Rewards Section -->
+                        <div class="shop-section">
+                            <h3 class="shop-section-title"><i class="fa-solid fa-gift"></i> マイご褒美引き換え</h3>
+                            <div class="rewards-list-container" id="custom-rewards-list">
+                                <!-- Dynamic rewards list -->
+                            </div>
+                            
+                            <!-- Custom Reward Add Form -->
+                            <form class="reward-add-form" id="reward-add-form">
+                                <h4>新しいご褒美を登録</h4>
+                                <div class="reward-form-inputs">
+                                    <input type="text" id="add-reward-name" required placeholder="例: お菓子を食べる、ゲーム1時間" maxlength="25">
+                                    <input type="number" id="add-reward-cost" required min="10" max="1000" placeholder="G" title="必要ゴールド">
+                                    <button type="submit" class="btn btn-sm btn-primary" style="padding: 6px 12px;"><i class="fa-solid fa-plus"></i></button>
+                                </div>
+                            </form>
+                        </div>
+
                     </div>
                 </div>
             </section>
@@ -308,6 +413,27 @@
             <div class="breathing-timer" id="breathing-timer">30</div>
             
             <button class="btn btn-outline mt-3" id="btn-skip-urge">呼吸法を終了する</button>
+        </div>
+    </div>
+
+    <!-- MODAL: Daily Login Bonus -->
+    <div class="modal-overlay hidden" id="login-modal">
+        <div class="modal-content glass-panel login-modal-content text-center">
+            <h3><i class="fa-solid fa-calendar-check icon-accent animate-pulse"></i> ギルドの日替わり給与</h3>
+            <p class="urge-intro">毎日ギルドに顔を出して、活動支援金（ゴールド）を獲得しましょう！</p>
+            
+            <div class="checkin-grid" id="checkin-grid">
+                <!-- Day cards dynamically rendered -->
+            </div>
+
+            <div class="streak-multiplier-note" id="streak-multiplier-note" style="margin-bottom: 20px;">
+                <i class="fa-solid fa-fire" style="color: #ff6b6b;"></i> 連続修行日数: <span id="login-streak-count">0</span>日 
+                (討伐時ゴールド獲得倍率: <span id="login-multiplier-val">1.0</span>x)
+            </div>
+            
+            <button class="btn btn-primary btn-large" id="btn-claim-login" style="min-width: 200px;">
+                報酬を受け取る
+            </button>
         </div>
     </div>
 
